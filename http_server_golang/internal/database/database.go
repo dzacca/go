@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Client
@@ -34,10 +36,10 @@ type User struct {
 
 // Post
 type Post struct {
-	ID        string `json:"id"`
-	CreatedAt string `json:"createdAt"`
-	UserEmail string `json:"userEmail"`
-	Text      string `json:"text"`
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UserEmail string    `json:"userEmail"`
+	Text      string    `json:"text"`
 }
 
 // EnsureDB creates the db file if it doesn't exist
@@ -175,5 +177,70 @@ func (c Client) DeleteUser(email string) error {
 		return err
 	}
 
+	return nil
+}
+
+// Posts
+//CreatePost
+func (c Client) CreatePost(userEmail, text string) (Post, error) {
+	db, err := c.readDB()
+
+	post := Post{}
+	if err != nil {
+		return post, errors.New("can't open the DB")
+	}
+	if _, ok := db.Users[userEmail]; !ok {
+		return post, errors.New("User not found")
+	}
+
+	id := uuid.New().String()
+	post = Post{
+		CreatedAt: time.Now().UTC(),
+		ID:        id,
+		UserEmail: userEmail,
+		Text:      text}
+
+	db.Posts[id] = post
+
+	err = c.updateDB(db)
+	if err != nil {
+		return post, errors.New("Can't update the DB")
+	}
+	return post, nil
+}
+
+// GetPosts
+func (c Client) GetPosts(userEmail string) ([]Post, error) {
+	db, err := c.readDB()
+	if err != nil {
+		p := []Post{}
+		return p, errors.New("Can't open the DB")
+	}
+
+	posts := make([]Post, 0)
+	for _, post := range db.Posts {
+		if post.UserEmail == userEmail {
+			posts = append(posts, post)
+		}
+	}
+
+	return posts, nil
+}
+
+// DeletePost
+func (c Client) DeletePost(id string) error {
+	db, err := c.readDB()
+	if err != nil {
+		return errors.New("Can't open the DB")
+	}
+	if _, ok := db.Posts[id]; !ok {
+		return errors.New("Post not found")
+	}
+	delete(db.Posts, id)
+
+	err = c.updateDB(db)
+	if err != nil {
+		return err
+	}
 	return nil
 }
